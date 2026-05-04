@@ -171,11 +171,8 @@ int main(){
 
     int n_gvrp, n_vrp;
 
-    //clock_t ini = clock();
     guloso_gvrp(clientes, n, capacidade, rotas_gvrp, &n_gvrp, 1);
-    //clock_t fim = clock();
 
-    //double tempo_gvrp = (double)(fim - ini) / CLOCKS_PER_SEC;
 
     double consumo_gvrp = 0;
     for (int i=0; i < n_gvrp; i++){
@@ -184,10 +181,7 @@ int main(){
 
     reset_visitados(clientes, n);
 
-    //clock_t ini_vrp = clock();
     guloso_gvrp(clientes, n, capacidade, rotas_vrp, &n_vrp, 0);
-    //clock_t fim_vrp = clock();
-    //double tempo_vrp = (double)(fim_vrp - ini_vrp) / CLOCKS_PER_SEC;
 
     int nao_visitados = 0;
 
