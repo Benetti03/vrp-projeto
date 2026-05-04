@@ -210,8 +210,6 @@ int main(){
     printf("GVRP -> Combustivel: %.2f L | Veiculos: %d\n", consumo_gvrp, n_gvrp);
     printf("VRP  -> Combustivel: %.2f L | Veiculos: %d\n", consumo_vrp, n_vrp);
     printf("Economia: %.2f%%\n", economia);
-    //printf("Tempo GVRP: %.4f segundos\n", tempo_gvrp);
-    //printf("Tempo GVRP: %.4f segundos\n", tempo_vrp);
 
     return 0;
 }
