@@ -1,0 +1,4 @@
+#Escreva o comando abaixo no PowerShell
+
+
+gcc main.c -o main.exe ; .\main.exe
