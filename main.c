@@ -179,6 +179,20 @@ int main(){
         consumo_gvrp += rotas_gvrp[i].consumo_total;
     } 
 
+    /* PARTE 2  DO TRABALHO */
+    
+     clock_t t2 = clock();
+ 
+    /* Passo 1 — 2-opt em cada rota individualmente */
+    for (int v = 0; v < n_gvrp; v++){
+        dois_opt(&rotas_gvrp[v], clientes);
+    }
+    clock_t t3 = clock();
+ 
+    double consumo_gvrp_bl = 0.0;
+    for (int i = 0; i < n_gvrp; i++)
+        consumo_gvrp_bl += rotas_gvrp[i].consumo_total;
+
     reset_visitados(clientes, n);
 
     guloso_gvrp(clientes, n, capacidade, rotas_vrp, &n_vrp, 0);
