@@ -180,8 +180,7 @@ void recalcula_rota(Rota *r, Cliente clientes[]) {
 
 /*
  * Heurística de busca local 2-opt
- * O 2-opt é um movimento clássico que inverte um segmento da rota para eliminar cruzamentos.
- * Referências: Croes (1958), Lin (1965), Bektaş & Laporte (2011) — modelo de consumo.
+ * Referências pro artigo: Croes (1958), Lin (1965), Bektaş & Laporte (2011) — modelo de consumo.
  */
 void dois_opt(Rota *r, Cliente clientes[]) {
     int melhorou = 1;
@@ -239,80 +238,6 @@ void dois_opt(Rota *r, Cliente clientes[]) {
     }
 }
 
-/* ─────────────────────────────────────────────────────────────
-   BUSCA LOCAL 2: RELOCATE (inter-rota)
-   ─────────────────────────────────────────────────────────────
-   Referências: Savelsbergh (1992) [ref. 3], Toth & Vigo (2003) [ref. 4]
-   Complexidade: O(n² × k) onde k = número de veículos.
-   ───────────────────────────────────────────────────────────── */
-int relocate(Rota rotas[], int num_rotas, Cliente clientes[],
-             double capacidade) {
-    int melhorou_global = 0, melhorou;
- 
-    do {
-        melhorou = 0;
- 
-        for (int r_orig = 0; r_orig < num_rotas; r_orig++) {
-            if (rotas[r_orig].tamanho <= 3) continue;
- 
-            for (int pos = 1; pos < rotas[r_orig].tamanho - 1; pos++) {
-                int    cli     = rotas[r_orig].sequencia[pos];
-                double dem_cli = clientes[cli].demanda;
- 
-                double d_prev_cli  = distancia(clientes[rotas[r_orig].sequencia[pos-1]], clientes[cli]);
-                double d_cli_next  = distancia(clientes[cli], clientes[rotas[r_orig].sequencia[pos+1]]);
-                double d_prev_next = distancia(clientes[rotas[r_orig].sequencia[pos-1]], clientes[rotas[r_orig].sequencia[pos+1]]);
-                double ganho_remocao = (d_prev_cli + d_cli_next) - d_prev_next;
- 
-                double melhor_ganho = 1e-9;  
-                int melhor_rdest = -1, melhor_pos_dest = -1;
- 
-                for (int r_dest = 0; r_dest < num_rotas; r_dest++) {
-                    if (r_dest == r_orig) continue;
-                    if (rotas[r_dest].carga_atual + dem_cli > capacidade) continue;
- 
-                    for (int p = 1; p < rotas[r_dest].tamanho; p++) {
-                        double d_ins_esq = distancia(clientes[rotas[r_dest].sequencia[p-1]], clientes[cli]);
-                        double d_ins_dir = distancia(clientes[cli], clientes[rotas[r_dest].sequencia[p]]);
-                        double d_ins_antiga = distancia(clientes[rotas[r_dest].sequencia[p-1]], clientes[rotas[r_dest].sequencia[p]]);
- 
-                        double custo_insercao = (d_ins_esq + d_ins_dir) - d_ins_antiga;
-                        double ganho_total = ganho_remocao - custo_insercao;
- 
-                        if (ganho_total > melhor_ganho) {
-                            melhor_ganho     = ganho_total;
-                            melhor_rdest     = r_dest;
-                            melhor_pos_dest  = p;
-                        }
-                    }
-                }
- 
-                if (melhor_rdest == -1) continue;
- 
-                for (int k = pos; k < rotas[r_orig].tamanho - 1; k++){
-                    rotas[r_orig].sequencia[k] = rotas[r_orig].sequencia[k+1];
-                }
-                rotas[r_orig].tamanho--;
- 
-                for (int k = rotas[melhor_rdest].tamanho; k > melhor_pos_dest; k--){
-                    rotas[melhor_rdest].sequencia[k] = rotas[melhor_rdest].sequencia[k-1];
-                }
-                rotas[melhor_rdest].sequencia[melhor_pos_dest] = cli;
-                rotas[melhor_rdest].tamanho++;
- 
-                recalcula_rota(&rotas[r_orig],    clientes);
-                recalcula_rota(&rotas[melhor_rdest], clientes);
- 
-                melhorou = melhorou_global = 1;
-                break; /* reinicia após cada movimento aceito */
-            }
-            if (melhorou) break;
-        }
-    } while (melhorou);
- 
-    return melhorou_global;
-}
-
 int main(){
     Cliente clientes[NUM_CLIENTES];
     Rota rotas_gvrp[NUM_VEICULOS], rotas_vrp[NUM_VEICULOS];
@@ -333,9 +258,8 @@ int main(){
 
     /* PARTE 2  DO TRABALHO */
     
-     clock_t t2 = clock();
+    clock_t t2 = clock();
  
-    /* Passo 1 — 2-opt em cada rota individualmente */
     for (int v = 0; v < n_gvrp; v++){
         dois_opt(&rotas_gvrp[v], clientes);
     }
@@ -369,10 +293,10 @@ int main(){
  
     printf("\nClientes nao visitados: %d\n\n", nao_visitados);
     printf("=== RESULTADOS ===\n\n");
-    printf("| GVRP Guloso        | Combustivel: %8.2f L | Veiculos: %d | Tempo: %.4fs\n", consumo_gvrp_guloso, n_gvrp, tempo_guloso);
-    printf("| GVRP + Busca Local | Combustivel: %8.2f L | Veiculos: %d | Tempo BL: %.4fs | Melhoria: %.2f%%\n", consumo_gvrp_bl, n_gvrp, tempo_buscalocal, melhoria_buscalocal);
-    printf("| VRP  Guloso        | Combustivel: %8.2f L | Veiculos: %d\n\n", consumo_vrp, n_vrp);
-    printf("Economia GVRP + Busca Local vs VRP: %.2f%%\n", economia_vrp);
+    printf("| GVRP Guloso        | Combustivel: %8.2f L | Veiculos: %d | Tempo: %.4fs |\n", consumo_gvrp_guloso, n_gvrp, tempo_guloso);
+    printf("| GVRP + 2-opt | Combustivel: %8.2f L | Veiculos: %d | Tempo: %.4fs | Melhoria: %.2f%% | \n", consumo_gvrp_bl, n_gvrp, tempo_buscalocal, melhoria_buscalocal);
+    printf("| VRP  Guloso        | Combustivel: %8.2f L | Veiculos: %d | \n\n", consumo_vrp, n_vrp);
+    printf("Economia (GVRP + 2-opt) vs VRP: %.2f%% \n", economia_vrp);
 
     return 0;
 }
