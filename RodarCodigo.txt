@@ -1,4 +1,12 @@
-#Escreva o comando abaixo no PowerShell
+#Referências
 
+#Consumo
+Bektas e Laporte (2011)
+
+#Ant Colony
+Dorigo, M., & Gambardella, L. M. (1997). Ant Colony System: A Cooperative Learning Approach to the Traveling Salesman Problem. IEEE Transactions on Evolutionary Computation, 1(1), 53–66.
+Bullnheimer, B., Hartl, R. F., & Strauss, C. (1999). An Improved Ant System Algorithm for the Vehicle Routing Problem. Annals of Operations Research, 89, 319–328.       
+
+#Escreva o comando abaixo no PowerShell
 
 gcc main.c -o main.exe ; .\main.exe

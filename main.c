@@ -3,6 +3,7 @@
 #include <math.h>
 #include <string.h>
 #include <time.h>
+#include <stdlib.h>
 
 #define NUM_CLIENTES 100
 #define NUM_VEICULOS 30
@@ -91,52 +92,54 @@ void ler_instancia(const char *arquivo, Cliente clientes[], int *n, double *capa
     fclose(f);
 }
 
-int guloso_gvrp(Cliente clientes[],int num_clientes, double capacidade, Rota rotas[], int *num_rotas, int modo_gvrp){
+int guloso_gvrp(Cliente clientes[], int num_clientes, double capacidade, Rota rotas[], int *num_rotas, int modo_gvrp, int max_veiculos) {
     int visitados = 0;
     *num_rotas = 0;
 
-    while(visitados < num_clientes - 1){
+    while (visitados < num_clientes - 1) {
+        int ultimo_veiculo = (*num_rotas >= max_veiculos - 1);
+
         Rota *rota_atual = &rotas[*num_rotas];
-        rota_atual->tamanho = 0;
-        rota_atual->carga_atual = 0.0;
-        rota_atual->consumo_total = 0.0;
+        rota_atual->tamanho        = 0;
+        rota_atual->carga_atual    = 0.0;
+        rota_atual->consumo_total  = 0.0;
         rota_atual->distancia_total = 0.0;
 
         rota_atual->sequencia[rota_atual->tamanho++] = 0;
         int pos_atual = 0;
-        int inseriu = 0;
-        do{
+        int inseriu   = 0;
+
+        do {
             inseriu = 0;
             int melhor_idx = -1;
             double melhor_custo = INFINITY;
             double melhor_dist = 0.0;
 
-            for(int i = 1; i < num_clientes; i++){
+            for (int i = 1; i < num_clientes; i++) {
                 if (clientes[i].visitado) continue;
-                if (clientes[i].demanda + rota_atual->carga_atual > capacidade) continue;
+
+                if (!ultimo_veiculo && (clientes[i].demanda + rota_atual->carga_atual > capacidade)) continue;
 
                 double dist = distancia(clientes[pos_atual], clientes[i]);
-                double carga_veiculo = capacidade - rota_atual->carga_atual;
+
+                double carga_na_aresta = rota_atual->carga_atual + clientes[i].demanda;
                 double custo = 0.0;
+                custo = (modo_gvrp == 1) ? consumo_aresta(dist, carga_na_aresta) : dist;
 
-                if (modo_gvrp == 1) {
-                    custo = consumo_aresta(dist, carga_veiculo);
-                }else {
-                    custo = dist; 
-                }
-
-                if (custo < melhor_custo){
+                if (custo < melhor_custo) {
                     melhor_custo = custo;
-                    melhor_dist = dist;
-                    melhor_idx = i;
+                    melhor_dist  = dist;
+                    melhor_idx   = i;
                 }
             }
 
             if (melhor_idx != -1) {
+                double carga_na_aresta = rota_atual->carga_atual + clientes[melhor_idx].demanda;
+
                 clientes[melhor_idx].visitado = 1;
                 rota_atual->carga_atual += clientes[melhor_idx].demanda;
 
-                rota_atual->consumo_total += melhor_custo;
+                rota_atual->consumo_total += consumo_aresta(melhor_dist, carga_na_aresta);
                 rota_atual->distancia_total += melhor_dist;
                 rota_atual->sequencia[rota_atual->tamanho++] = melhor_idx;
 
@@ -144,11 +147,11 @@ int guloso_gvrp(Cliente clientes[],int num_clientes, double capacidade, Rota rot
                 visitados++;
                 inseriu = 1;
             }
-        } while(inseriu);
+        } while (inseriu);
 
         double dist_retorno = distancia(clientes[pos_atual], clientes[0]);
         rota_atual->distancia_total += dist_retorno;
-        rota_atual->consumo_total += consumo_aresta(dist_retorno, rota_atual->carga_atual);
+        rota_atual->consumo_total   += consumo_aresta(dist_retorno, rota_atual->carga_atual);
         rota_atual->sequencia[rota_atual->tamanho++] = 0;
 
         (*num_rotas)++;
@@ -244,59 +247,93 @@ int main(){
     int n;
     double capacidade;
 
-    ler_instancia("tai75c.vrp", clientes, &n, &capacidade);
+    ler_instancia("tai75a.vrp", clientes, &n, &capacidade);
 
+
+    // Calcula K_min = ceil(soma_demandas / capacidade). Isso considera o menor número de veículos necessário para a demanda, respeitando o |K| das instâncias TAI da CVRPLIB.
+    double soma_demandas = 0.0;
+    for (int i = 1; i < n; i++){
+        soma_demandas += clientes[i].demanda;
+    }
+    int k_min        = (int)ceil(soma_demandas / capacidade);
+    int max_veiculos = k_min;
+
+    printf("Instancia: %d clientes | Capacidade: %.0f | ""Demanda total: %.0f | K_min: %d\n\n", n - 1, capacidade, soma_demandas, k_min);
+
+    /*PARTE 1 do Trabalho: Guloso GVRP */
     int n_gvrp;
     clock_t t0 = clock();
-    guloso_gvrp(clientes, n, capacidade, rotas_gvrp, &n_gvrp, 1);
+    guloso_gvrp(clientes, n, capacidade, rotas_gvrp, &n_gvrp, 1, max_veiculos);
     clock_t t1 = clock();
 
-    double consumo_gvrp_guloso = 0;
-    for (int i=0; i < n_gvrp; i++){
+    double consumo_gvrp_guloso = 0.0;
+    for (int i = 0; i < n_gvrp; i++){
         consumo_gvrp_guloso += rotas_gvrp[i].consumo_total;
-    } 
+    }
 
-    /* PARTE 2  DO TRABALHO */
-    
+    /*PARTE 2: Busca local 2-opt*/
     clock_t t2 = clock();
- 
     for (int v = 0; v < n_gvrp; v++){
         dois_opt(&rotas_gvrp[v], clientes);
     }
     clock_t t3 = clock();
- 
-    double consumo_gvrp_bl = 0.0;
-    for (int i = 0; i < n_gvrp; i++)
-        consumo_gvrp_bl += rotas_gvrp[i].consumo_total;
 
+    double consumo_gvrp_bl = 0.0;
+    for (int i = 0; i < n_gvrp; i++){
+        consumo_gvrp_bl += rotas_gvrp[i].consumo_total;
+    }
+
+    /* VRP Guloso pra comparar */
     reset_visitados(clientes, n);
     int n_vrp;
-    guloso_gvrp(clientes, n, capacidade, rotas_vrp, &n_vrp, 0);
+    guloso_gvrp(clientes, n, capacidade, rotas_vrp, &n_vrp, 0, max_veiculos);
 
-    /* Garantia que todos foram visitados (se não foram vai atualizar o valor)*/
     int nao_visitados = 0;
-    for (int i = 1; i < n; i++) {
-        if (!clientes[i].visitado) {
-            nao_visitados++;
-        }
-    }
-    
-    double consumo_vrp = 0.0;
-    for (int i = 0; i < n_vrp; i++){
-        consumo_vrp += rotas_vrp[i].consumo_total;
-    }
+    for (int i = 1; i < n; i++)
+        if (!clientes[i].visitado) nao_visitados++;
 
-    double tempo_guloso = (double)(t1 - t0) / CLOCKS_PER_SEC;
-    double tempo_buscalocal     = (double)(t3 - t2) / CLOCKS_PER_SEC;
-    double melhoria_buscalocal  = 100.0 * (consumo_gvrp_guloso - consumo_gvrp_bl)/ consumo_gvrp_guloso;
-    double economia_vrp = 100.0 * (consumo_vrp - consumo_gvrp_bl) / consumo_vrp;
- 
+    double consumo_vrp = 0.0;
+    for (int i = 0; i < n_vrp; i++)
+        consumo_vrp += rotas_vrp[i].consumo_total;
+
+    /* ── PARTE 3: ACO ── */
+    /*srand((unsigned int)time(NULL));
+
+    printf("=== ACO em execucao (%d formigas x %d iteracoes) ===\n",
+           NUM_FORMIGAS, NUM_ITER);
+
+    Rota rotas_aco[NUM_VEICULOS];
+    int  n_aco = 0;
+
+    clock_t t4 = clock();
+    double consumo_aco = aco_gvrp(clientes, n, capacidade,
+                                  rotas_aco, &n_aco, max_veiculos);
+    clock_t t5 = clock();*/
+
+    /* ── Métricas ── */
+    double tempo_guloso = (double)(t1 - t0)/CLOCKS_PER_SEC;
+    double tempo_bl = (double)(t3 - t2)/CLOCKS_PER_SEC;
+    //double tempo_aco = (double)(t5 - t4)/CLOCKS_PER_SEC;
+
+    double melhoria_bl = 100.0 * (consumo_gvrp_guloso - consumo_gvrp_bl)/consumo_gvrp_guloso;
+    //double melhoria_aco_guloso = 100.0 * (consumo_gvrp_guloso - consumo_aco)/consumo_gvrp_guloso;
+    //double melhoria_aco_bl = 100.0 * (consumo_gvrp_bl - consumo_aco)/consumo_gvrp_bl;
+    double economia_bl_vrp = 100.0 * (consumo_vrp - consumo_gvrp_bl)/consumo_vrp;
+    //double economia_aco_vrp = 100.0 * (consumo_vrp - consumo_aco)/consumo_vrp;
+
+    /* Viabilidade: dentro do limite de frota? */
+    const char *v_guloso = (n_gvrp <= max_veiculos) ? "OK" : "INVIAVEL";
+    const char *v_bl = (n_gvrp <= max_veiculos) ? "OK" : "INVIAVEL";
+    //const char *v_aco = (n_aco  <= max_veiculos) ? "OK" : "INVIAVEL";
+
     printf("\nClientes nao visitados: %d\n\n", nao_visitados);
     printf("=== RESULTADOS ===\n\n");
-    printf("| GVRP Guloso        | Combustivel: %8.2f L | Veiculos: %d | Tempo: %.4fs |\n", consumo_gvrp_guloso, n_gvrp, tempo_guloso);
-    printf("| GVRP + 2-opt | Combustivel: %8.2f L | Veiculos: %d | Tempo: %.4fs | Melhoria: %.2f%% | \n", consumo_gvrp_bl, n_gvrp, tempo_buscalocal, melhoria_buscalocal);
-    printf("| VRP  Guloso        | Combustivel: %8.2f L | Veiculos: %d | \n\n", consumo_vrp, n_vrp);
-    printf("Economia (GVRP + 2-opt) vs VRP: %.2f%% \n", economia_vrp);
+    printf("| GVRP Guloso  | Combustivel: %8.2f L | Veiculos: %2d/%d [%s] | Tempo: %.4fs |\n", consumo_gvrp_guloso, n_gvrp, max_veiculos, v_guloso, tempo_guloso);
+    printf("| GVRP + 2-opt | Combustivel: %8.2f L | Veiculos: %2d/%d [%s] | Tempo: %.4fs | Melhoria vs guloso: %.2f%% |\n", consumo_gvrp_bl, n_gvrp, max_veiculos, v_bl, tempo_bl, melhoria_bl);
+    //printf("| GVRP + ACO   | Combustivel: %8.2f L | Veiculos: %2d/%d [%s] | Tempo: %.4fs | Melhoria vs guloso: %.2f%% | Melhoria vs 2-opt: %.2f%% |\n", consumo_aco, n_aco, max_veiculos, v_aco, tempo_aco, melhoria_aco_guloso, melhoria_aco_bl);
+    printf("| VRP  Guloso  | Combustivel: %8.2f L | Veiculos: %2d/%d |\n\n", consumo_vrp, n_vrp, max_veiculos);
+    printf("Economia (GVRP + 2-opt) vs VRP : %.2f%%\n", economia_bl_vrp);
+    //printf("Economia (GVRP + ACO)   vs VRP : %.2f%%\n", economia_aco_vrp);
 
     return 0;
 }
